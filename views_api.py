@@ -1,6 +1,10 @@
 from http import HTTPStatus
 from typing import List
 
+import bech32
+import websockets
+import json
+
 from fastapi import Depends
 from loguru import logger
 from starlette.exceptions import HTTPException
@@ -12,7 +16,6 @@ from . import scheduled_tasks, splitpayments_ext
 from .crud import get_targets, set_targets
 from .models import Target, TargetPutList
 
-
 @splitpayments_ext.get("/api/v1/targets")
 async def api_targets_get(
     wallet: WalletTypeInfo = Depends(require_admin_key),
@@ -20,12 +23,42 @@ async def api_targets_get(
     targets = await get_targets(wallet.wallet.id)
     return targets or []
 
-
 @splitpayments_ext.put("/api/v1/targets", status_code=HTTPStatus.OK)
 async def api_targets_set(
     target_put: TargetPutList,
     source_wallet: WalletTypeInfo = Depends(require_admin_key),
-) -> None:
+) -> None:    
+
+    #"npub1ysxnqpymj6tq9cvqc6xfsughar0vkynxtyxqjaud5e5hq88cvf2qehzld9"
+    #lnURL = asyncio.get_event_loop().run_until_complete(hello())
+    #h, rawPub = bech32.bech32_decode("npub1ysxnqpymj6tq9cvqc6xfsughar0vkynxtyxqjaud5e5hq88cvf2qehzld9")
+    #print(bytes(rawPub).decode('ascii'))
+    hrp, data = bech32.bech32_decode("npub1ysxnqpymj6tq9cvqc6xfsughar0vkynxtyxqjaud5e5hq88cvf2qehzld9")
+    raw_secret = bech32.convertbits(data, 5, 8)
+    if raw_secret[-1] != 0x0:
+        pubkey = str(bytes(raw_secret).hex())        
+    else:
+        pubkey = str(bytes(raw_secret[:-1]).hex())        
+
+    uri = "wss://nostr-pub.wellorder.net"
+    jsonOb = ''
+    
+    async with websockets.connect(uri) as websocket:
+    #websocket = websockets.connect(uri)
+        print("Pubkey used: ", pubkey)
+        req = '["REQ", "a",  {"kinds": [0], "limit": 10, "authors": ["'+ pubkey +'"]} ]'
+        ''' send req to websocket and print response'''
+        await websocket.send(req)
+        print(f"> {req}")
+        greeting = await websocket.recv()
+        output = json.loads(greeting)
+        jsonOb = json.loads(output[2]['content'])
+        print(jsonOb["username"])
+        print(jsonOb["lud16"])
+        print(jsonOb["lud06"])
+        
+    #logger.info("inside splitpaymets put: "+jsonOb["username"])
+    #print(jsonOb["username"])
     try:
         targets: List[Target] = []
         for entry in target_put.targets:
@@ -35,6 +68,8 @@ async def api_targets_set(
                 if not wallet:
                     wallet = await get_wallet_for_key(entry.wallet, "invoice")
                     if not wallet:
+                        if entry.wallet.find("npub") >= 0:
+                            logger.info("inside splitpayments put: "+jsonOb["username"])
                         raise HTTPException(
                             status_code=HTTPStatus.BAD_REQUEST,
                             detail=f"Invalid wallet '{entry.wallet}'.",

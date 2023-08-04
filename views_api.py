@@ -28,21 +28,15 @@ async def api_targets_set(
     target_put: TargetPutList,
     source_wallet: WalletTypeInfo = Depends(require_admin_key),
 ) -> None:
-        
-    #logger.info("inside splitpaymets put: "+jsonOb["username"])
-    #print(jsonOb["username"])
+            
     try:
         targets: List[Target] = []
-        for entry in target_put.targets:            
-            print(entry.wallet.find("@"), entry.wallet.find("LNURL"), entry.wallet.find("npub"))
+        for entry in target_put.targets:                        
             if entry.wallet.find("@") < 0 and entry.wallet.find("LNURL") < 0 and entry.wallet.find("npub") < 0:
                 wallet = await get_wallet(entry.wallet)
                 if not wallet:
                     wallet = await get_wallet_for_key(entry.wallet, "invoice")
-                    if not wallet:
-                        if entry.wallet.find("npub") >= 0:
-                            logger.info("inside npub splitpaymets put: ")                                                        
-                        
+                    if not wallet:                        
                         raise HTTPException(
                             status_code=HTTPStatus.BAD_REQUEST,
                             detail=f"Invalid wallet '{entry.wallet}'.",
@@ -60,8 +54,7 @@ async def api_targets_set(
                 )
 
             
-            if entry.wallet.find("npub") >= 0:   
-                print("npub is processed: ", entry.wallet, "!!!!!")             
+            if entry.wallet.find("npub") >= 0:                   
                 hrp, data = bech32.bech32_decode(entry.wallet)
                 raw_secret = bech32.convertbits(data, 5, 8)
                 if raw_secret[-1] != 0x0:
@@ -74,24 +67,19 @@ async def api_targets_set(
                 
                 async with websockets.connect(uri) as websocket:
                 #websocket = websockets.connect(uri)
-                    print("Pubkey used: ", pubkey)
                     req = '["REQ", "a",  {"kinds": [0], "limit": 10, "authors": ["'+ pubkey +'"]} ]'
                     ''' send req to websocket and print response'''
-                    await websocket.send(req)
-                    print(f"> {req}")
+                    await websocket.send(req)                    
                     greeting = await websocket.recv()
                     output = json.loads(greeting)
                     jsonOb = json.loads(output[2]['content'])
-                    
-                if "username" in jsonOb:
-                    logger.info("inside npub splitpaymets put: "+jsonOb["username"])
-                
+                                                    
                 if "lud16" in jsonOb:
-                    logger.info(jsonOb["lud16"])
+                    logger.info("we got a lud16: ", jsonOb["lud16"])
                     if len(jsonOb["lud16"]) > 1:
                         npubWallet = jsonOb["lud16"]
                 elif "lud06" in jsonOb:
-                    logger.info(jsonOb["lud06"])
+                    logger.info("we got a lud06: ", jsonOb["lud06"])
                     if len(jsonOb["lud06"]) > 1:
                         npubWallet = jsonOb["lud06"]                                                    
                 else:

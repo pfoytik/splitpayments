@@ -20,56 +20,29 @@ from .models import Target, TargetPutList
 async def api_targets_get(
     wallet: WalletTypeInfo = Depends(require_admin_key),
 ) -> List[Target]:
-    targets = await get_targets(wallet.wallet.id)
+    targets = await get_targets(wallet.wallet.id)    
     return targets or []
 
 @splitpayments_ext.put("/api/v1/targets", status_code=HTTPStatus.OK)
 async def api_targets_set(
     target_put: TargetPutList,
     source_wallet: WalletTypeInfo = Depends(require_admin_key),
-) -> None:    
-
-    #"npub1ysxnqpymj6tq9cvqc6xfsughar0vkynxtyxqjaud5e5hq88cvf2qehzld9"
-    #lnURL = asyncio.get_event_loop().run_until_complete(hello())
-    #h, rawPub = bech32.bech32_decode("npub1ysxnqpymj6tq9cvqc6xfsughar0vkynxtyxqjaud5e5hq88cvf2qehzld9")
-    #print(bytes(rawPub).decode('ascii'))
-    hrp, data = bech32.bech32_decode("npub1ysxnqpymj6tq9cvqc6xfsughar0vkynxtyxqjaud5e5hq88cvf2qehzld9")
-    raw_secret = bech32.convertbits(data, 5, 8)
-    if raw_secret[-1] != 0x0:
-        pubkey = str(bytes(raw_secret).hex())        
-    else:
-        pubkey = str(bytes(raw_secret[:-1]).hex())        
-
-    uri = "wss://nostr-pub.wellorder.net"
-    jsonOb = ''
-    
-    async with websockets.connect(uri) as websocket:
-    #websocket = websockets.connect(uri)
-        print("Pubkey used: ", pubkey)
-        req = '["REQ", "a",  {"kinds": [0], "limit": 10, "authors": ["'+ pubkey +'"]} ]'
-        ''' send req to websocket and print response'''
-        await websocket.send(req)
-        print(f"> {req}")
-        greeting = await websocket.recv()
-        output = json.loads(greeting)
-        jsonOb = json.loads(output[2]['content'])
-        print(jsonOb["username"])
-        print(jsonOb["lud16"])
-        print(jsonOb["lud06"])
+) -> None:
         
     #logger.info("inside splitpaymets put: "+jsonOb["username"])
     #print(jsonOb["username"])
     try:
         targets: List[Target] = []
-        for entry in target_put.targets:
-
-            if entry.wallet.find("@") < 0 and entry.wallet.find("LNURL") < 0:
+        for entry in target_put.targets:            
+            print(entry.wallet.find("@"), entry.wallet.find("LNURL"), entry.wallet.find("npub"))
+            if entry.wallet.find("@") < 0 and entry.wallet.find("LNURL") < 0 and entry.wallet.find("npub") < 0:
                 wallet = await get_wallet(entry.wallet)
                 if not wallet:
                     wallet = await get_wallet_for_key(entry.wallet, "invoice")
                     if not wallet:
                         if entry.wallet.find("npub") >= 0:
-                            logger.info("inside splitpayments put: "+jsonOb["username"])
+                            logger.info("inside npub splitpaymets put: ")                                                        
+                        
                         raise HTTPException(
                             status_code=HTTPStatus.BAD_REQUEST,
                             detail=f"Invalid wallet '{entry.wallet}'.",
@@ -78,7 +51,7 @@ async def api_targets_set(
                 if wallet.id == source_wallet.wallet.id:
                     raise HTTPException(
                         status_code=HTTPStatus.BAD_REQUEST, detail="Can't split to itself."
-                    )
+                    )                        
 
             if entry.percent <= 0:
                 raise HTTPException(
@@ -86,14 +59,63 @@ async def api_targets_set(
                     detail=f"Invalid percent '{entry.percent}'.",
                 )
 
-            targets.append(
-                Target(
-                    wallet=entry.wallet,
-                    source=source_wallet.wallet.id,
-                    percent=entry.percent,
-                    alias=entry.alias,
+            
+            if entry.wallet.find("npub") >= 0:   
+                print("npub is processed: ", entry.wallet, "!!!!!")             
+                hrp, data = bech32.bech32_decode(entry.wallet)
+                raw_secret = bech32.convertbits(data, 5, 8)
+                if raw_secret[-1] != 0x0:
+                    pubkey = str(bytes(raw_secret).hex())        
+                else:
+                    pubkey = str(bytes(raw_secret[:-1]).hex())        
+
+                uri = "wss://nostr-pub.wellorder.net"
+                jsonOb = ''
+                
+                async with websockets.connect(uri) as websocket:
+                #websocket = websockets.connect(uri)
+                    print("Pubkey used: ", pubkey)
+                    req = '["REQ", "a",  {"kinds": [0], "limit": 10, "authors": ["'+ pubkey +'"]} ]'
+                    ''' send req to websocket and print response'''
+                    await websocket.send(req)
+                    print(f"> {req}")
+                    greeting = await websocket.recv()
+                    output = json.loads(greeting)
+                    jsonOb = json.loads(output[2]['content'])
+                    
+                if "username" in jsonOb:
+                    logger.info("inside npub splitpaymets put: "+jsonOb["username"])
+                
+                if "lud16" in jsonOb:
+                    logger.info(jsonOb["lud16"])
+                    if len(jsonOb["lud16"]) > 1:
+                        npubWallet = jsonOb["lud16"]
+                elif "lud06" in jsonOb:
+                    logger.info(jsonOb["lud06"])
+                    if len(jsonOb["lud06"]) > 1:
+                        npubWallet = jsonOb["lud06"]                                                    
+                else:
+                    raise HTTPException(
+                        status_code=HTTPStatus.BAD_REQUEST,
+                        detail=f"Invalid wallet '{entry.wallet}'.",
+                    )
+                targets.append(
+                    Target(
+                        wallet=npubWallet,
+                        source=source_wallet.wallet.id,
+                        percent=entry.percent,
+                        alias=entry.alias,
+                    )
                 )
-            )
+            else:
+                targets.append(
+                    Target(
+                        wallet=entry.wallet,
+                        source=source_wallet.wallet.id,
+                        percent=entry.percent,
+                        alias=entry.alias,
+                    )
+                )
 
             percent_sum = sum([target.percent for target in targets])
             if percent_sum > 100:

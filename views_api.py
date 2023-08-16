@@ -62,6 +62,8 @@ async def api_targets_set(
                 else:
                     pubkey = str(bytes(raw_secret[:-1]).hex())        
 
+                ## URI for relay used
+                ## TODO - make this a variable assigned by the user with a default relat
                 uri = "wss://nostr-pub.wellorder.net"
                 jsonOb = ''
                 
@@ -93,6 +95,7 @@ async def api_targets_set(
                         source=source_wallet.wallet.id,
                         percent=entry.percent,
                         alias=entry.alias,
+                        walletName=entry.wallet,
                     )
                 )
             else:
@@ -102,6 +105,7 @@ async def api_targets_set(
                         source=source_wallet.wallet.id,
                         percent=entry.percent,
                         alias=entry.alias,
+                        walletName=entry.wallet,
                     )
                 )
 

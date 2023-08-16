@@ -10,6 +10,7 @@ class Target(BaseModel):
     source: str
     percent: float
     alias: Optional[str]
+    walletName: Optional[str]
 
     @classmethod
     def from_row(cls, row: Row):

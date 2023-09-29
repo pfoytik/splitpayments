@@ -13,7 +13,7 @@ LNbits Split Payments extension allows for distributing payments across multiple
 
 2. Add the wallet or wallets info to split payments to
 
-![split wallets](https://i.imgur.com/5hCNWpg.png) - get the LNURLp, a LNaddress, wallet id, or an invoice key from a different wallet. It can be a completely different user on another instance/domain. You can get the wallet information on the API Info section on every wallet page\
+![split wallets](https://image.nostr.build/1ccd166649cd67dd0c85c1b4f6decec3eb0fa267a311bc7c3efec8bd165fad05.png) - get the LNURLp, a LNaddress, wallet id, or an invoice key from a different wallet. It can be a completely different user on another instance/domain. You can get the wallet information on the API Info section on every wallet page\
  ![wallet info](https://i.imgur.com/betqflC.png) - set a wallet _Alias_ for your own identification\
 
 - set how much, in percentage, this wallet will receive from every payment sent to the source wallet
